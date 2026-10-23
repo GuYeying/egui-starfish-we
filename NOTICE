@@ -1,0 +1,22 @@
+# NOTICE（衍生与许可声明）
+
+egui-starfish-we 是 [egui-winit](https://github.com/emilk/egui) v0.37.0 的源码级 vendored fork，
+沿用上游 **MIT OR Apache-2.0** 双许可。两份许可全文见仓库根目录
+`LICENSE-MIT` / `LICENSE-APACHE`（取自上游仓库，文本未改动）。
+
+- egui / egui-winit：Copyright (c) Emil Ernerfeldt and egui contributors.
+- 本 fork 的修改：Copyright (c) 2026 starfish project.
+
+相对上游的修改清单（Apache-2.0 §4(b) 变更声明；详见 CLAUDE.md「与上游的差异」）：
+- Cargo.toml 重新合并：平台依赖按 target 表门控；winit 0.30.13；新增
+  log / profiling / web-time / windows-sys 依赖
+- 新增 starfish-we 翻译层：`State::new_we` / `on_we_event` /
+  `take_egui_input_we` / `handle_platform_output_we`、`load_system_cjk_fonts`
+  及 `translate_we_*` 翻译表
+- 自 winit 路径抽取共用助手：`on_key_and_text` / `on_cursor_moved_points` /
+  `on_wheel`，及 `State::new_inner`
+- 恢复 `pub mod clipboard;`
+- 新增 feature `render` 与 `SfEguiRenderer`（egui_wgpu::Renderer 包装：
+  `render` 收 starfish-render 的 `RenderPass` 包装的可变引用
+  （不转移所有权，内部以受控 unsafe 擦生命周期，契约见 lib.rs）、`raw_render`
+  收原生 `wgpu::RenderPass<'static>`，经 `Deref`/`DerefMut` 透传 update_* 方法）

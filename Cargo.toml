@@ -1,0 +1,123 @@
+[package]
+name = "egui-starfish-we"
+version = "0.1.0"
+edition = "2024"
+description = "egui-winit 0.37.0 vendored fork: starfish-we 拉模型窗口层的 egui 适配层"
+license = "MIT OR Apache-2.0"
+publish = false # vendored fork，不发布 crates.io
+
+
+[features]
+default = ["clipboard", "links", "wayland", "winit/default", "x11"]
+
+## Enable platform accessibility API implementations through [AccessKit](https://accesskit.dev/).
+accesskit = ["dep:accesskit_winit"]
+
+# Allow crates to choose an android-activity backend via Winit
+# - It's important that most applications should not have to depend on android-activity directly, and can
+#   rely on Winit to pull in a suitable version (unlike most Rust crates, any version conflicts won't link)
+# - It's also important that we don't impose an android-activity backend by taking this choice away from applications.
+## Enable the `game-activity` backend via Winit on Android
+android-game-activity = ["winit/android-game-activity"]
+## Enable the `native-activity` backend via Winit on Android
+android-native-activity = ["winit/android-native-activity"]
+
+## [`bytemuck`](https://docs.rs/bytemuck) enables you to cast [`egui::epaint::Vertex`], [`egui::Vec2`] etc to `&[u8]`.
+bytemuck = ["egui/bytemuck", "dep:bytemuck"]
+
+## Enable cut/copy/paste to OS clipboard.
+## If disabled a clipboard will be simulated so you can still copy/paste within the egui app.
+clipboard = ["arboard", "bytemuck", "smithay-clipboard"]
+
+## Enable opening links in a browser when an egui hyperlink is clicked.
+links = ["webbrowser"]
+
+## Allow serialization of [`WindowSettings`] using [`serde`](https://docs.rs/serde).
+serde = ["egui/serde", "dep:serde"]
+
+## Enables Wayland support.
+wayland = ["winit/wayland", "bytemuck", "arboard?/wayland-data-control"]
+
+## Enables compiling for x11.
+x11 = ["winit/x11", "winit/rwh_06", "bytemuck"]
+
+## starfish-render 桥：为 `egui_wgpu::Renderer` 提供收 `RenderPass` 包装的
+## `render` 扩展接口（原生 wgpu 通道走 `raw_render`，见 lib.rs `RendererSfRenderExt`）。
+render = ["dep:egui-wgpu", "dep:starfish-render"]
+
+
+
+[dependencies]
+egui = "=0.37.0"
+egui-winit = "0.37.0" # 上游 crate，过渡期共存；迁移完成后应移除
+log = { version = "0.4.34", features = ["std"] }
+profiling = { version = "1.0", default-features = false }
+raw-window-handle = "0.6"
+web-time = "1.1"
+winit = { version = "0.30.13", default-features = false } # src 按 winit 0.30 API 编写；default 后端由 feature "winit/default" 重开（对齐上游）
+starfish-we = { path = "../starfish/crates/starfish-we" } # we 路径入口依赖
+egui-wgpu = { version = "0.37.0", optional = true } # feature "render"：egui 绘制端
+starfish-std    = {path="../starfish/crates/starfish-std"}
+starfish-render = {path="../starfish/crates/starfish-render", features=["we"], optional=true} # feature "render"：包装 pass 桥（"we" 供 example 的 RenderEntry 建窗）
+starfish-time   = {path="../starfish/crates/starfish-time"}
+wgpu = { version = "30.0.1", default-features = false, features = [
+    "std", "parking_lot", "dx12", "metal", "vulkan", "gles", "wgsl", "webgl", "webgpu",
+] }
+
+bytemuck = { version = "1.23", features = ["derive"] , optional=true}
+serde = { version = "1.0", features = ["derive"] ,optional=true }
+accesskit_winit = {version = "0.34.1",optional=true}
+webbrowser = {version="1.2.4",optional=true} # 1.2.2 fixes RUSTSEC-2026-0257 (`BROWSER` argument injection)
+
+# 平台依赖一律走 target 表门控（对齐上游；无条件声明会在 Windows 上编入 wayland-sys/objc2 直接报错）
+[target.'cfg(any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd", target_os = "netbsd", target_os = "openbsd"))'.dependencies]
+smithay-clipboard = {version="0.7.2",optional=true} # 0.7.3 pulls smithay-client-toolkit 0.20 (calloop 0.14), duplicating the 0.19/0.13 that winit 0.30 needs
+wayland-cursor = { version = "0.31.14", optional = true, default-features = false }
+
+[target.'cfg(not(target_os = "android"))'.dependencies]
+arboard = { version = "3.6", default-features = false, optional = true, features = ["image-data"] }
+
+[target.'cfg(target_os = "ios")'.dependencies]
+objc2 = "0.6.5"
+objc2-foundation = { version = "0.3.2", default-features = false, features = [
+    "std",
+    "NSThread",
+] }
+objc2-ui-kit = { version = "0.3.2", default-features = false, features = [
+    "std",
+    "objc2-core-foundation",
+    "UIApplication",
+    "UIGeometry",
+    "UIResponder",
+    "UIScene",
+    "UISceneDefinitions",
+    "UIView",
+    "UIWindow",
+    "UIWindowScene",
+] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+block2 = "0.6.2"
+objc2 = "0.6.5"
+objc2-app-kit = { version = "0.3.2", default-features = false, features = [
+    "std",
+    "block2",
+    "NSEvent",
+    "NSResponder",
+] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { version = "0.61.2", features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Dwm",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
+# ── example/render_test.rs：starfish-we + starfish-render + egui 联调 ──
+[[example]]
+name = "render_test"
+path = "example/render_test.rs"
+required-features = ["render"] # 运行：cargo run --example render_test --features render
+
+[dev-dependencies]
+bytemuck = "1.23" # 主依赖为 optional，example 直接用 cast_slice
