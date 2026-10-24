@@ -190,7 +190,7 @@ impl Clipboard {
         }
 
         log::error!(
-            "Copying images is not supported. Enable the 'clipboard' feature of `egui-winit` to enable it."
+            "Copying images is not supported. Enable the 'clipboard' feature of `egui-starfish-we` to enable it."
         );
         _ = image;
     }
@@ -369,7 +369,7 @@ unsafe fn init_smithay_clipboard(
         log::debug!("Cannot init smithay clipboard without a Wayland display handle");
         #[cfg(not(feature = "wayland"))]
         log::debug!(
-            "Cannot init smithay clipboard: the 'wayland' feature of 'egui-winit' is not enabled"
+            "Cannot init smithay clipboard: the 'wayland' feature of 'egui-starfish-we' is not enabled"
         );
         None
     }

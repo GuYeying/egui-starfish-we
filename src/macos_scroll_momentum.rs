@@ -1,19 +1,21 @@
 //! Detect the OS-driven momentum ("kinetic") phase of trackpad scrolling on macOS.
 //!
-//! `AppKit` reports it via `NSEvent::momentumPhase`, but winit collapses that into the
-//! regular `TouchPhase`, so a momentum scroll looks just like a second finger scroll.
-//! We observe the raw `NSEvent`s ourselves with a local event monitor and remember
-//! whether the latest scroll event was part of the momentum phase.
+//! `AppKit` reports it via `NSEvent::momentumPhase`, but the window layer
+//! (starfish-we; upstream egui-winit had the same gap in winit) reports wheel
+//! deltas only — no phase/source — so a momentum scroll looks just like a
+//! regular scroll. We observe the raw `NSEvent`s ourselves with a local event
+//! monitor and remember whether the latest scroll event was part of the
+//! momentum phase.
 //!
-//! TODO(emilk): remove this module once we are on a winit version that includes
-//! <https://github.com/rust-windowing/winit/pull/4732>, which adds `ScrollSource`
-//! to `WindowEvent::MouseWheel`. Then read `source == ScrollSource::Momentum` instead.
+//! If starfish-we ever reports a scroll source/phase on `MouseWheel`, read
+//! that instead and delete this module (upstream expected winit PR #4732
+//! for the equivalent).
 //!
-//! The monitor runs before the event is dispatched to the window, so when winit hands us
-//! the corresponding `MouseWheel` event, the flag describes it. If several scroll events
-//! are delivered before winit dispatches them, the flag describes the last one; only the
-//! `Start` of a gesture reads the flag, so the worst case is a very short momentum
-//! phase being taken for a finger scroll.
+//! The monitor runs before the event is dispatched to the window, so when
+//! starfish-we hands us the corresponding `MouseWheel` event, the flag describes
+//! it. If several scroll events are delivered before dispatch, the flag
+//! describes the last one; only the `Start` of a gesture reads the flag, so the
+//! worst case is a very short momentum phase being taken for a finger scroll.
 
 #![allow(unsafe_code)] // Talking to AppKit
 

@@ -6,36 +6,37 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 本 crate 是 **egui-winit 0.37.0 的 vendored fork**（源码逐文件拷贝自 crates.io 发布包，作为独立新 crate 存在）。fork 而非包装的原因：egui-winit 部分模块/内部不对外公开，包装层够不到，只能改源码。
 
-**目标**：魔改 `src/lib.rs`，让使用风格符合 starfish-we（SDL 风格 pull 模型：调用方持主循环、`poll_event()` 拉事件），同时**尽可能保持 lib.rs 的内部结构**（`State` 及其方法布局沿用上游）。工作现状（2026-10-23）：**we 路径 v1 已接线**（全部并入 lib.rs 末段，刻意不拆独立文件）——`State::new_we` / `on_we_event` / `take_egui_input_we` / `handle_platform_output_we`，内部复用 `State` 全部机制；winit 路径暂保留共存；`wgpu` 依赖仍未使用。
+**目标**：starfish-we（SDL 风格 pull 模型：调用方持主循环、`poll_event()` 拉事件）窗口层的 egui 适配层。工作现状（2026-10-24）：**winit 依赖已整体剥离**——上游以 winit 为词汇的路径（回调式事件循环、多视口、IME 组合窗、位图光标、accesskit、窗口几何持久化）全部移除，lib.rs 只剩 starfish-we 单路径：`State::new_we` / `on_we_event` / `take_egui_input_we` / `handle_platform_output_we`；`State` 内部机制（剪贴板、快捷键折叠、键盘/指针/滚轮翻译、macOS 滚动动量）沿用上游。公共 API 不再带 `_we` 后缀重命名是后续可选项（暂保留后缀，减少 example/文档扰动）。
 
 - 本 crate 不在 starfish workspace 内，cargo 命令在本目录直接执行；路径依赖 `../starfish/crates/starfish-we` 指向 starfish 工作区。
 - 父项目 starfish（`../starfish`，有自己的 CLAUDE.md，接手先读）：SDL 风格 pull 模型跨平台引擎；**文档/注释/日志用中文**（starfish-we 源码为中英双语）。
-- 区分两个 egui-starfish-we：`starfish/crates/egui-starfish-we` 是旧的最小桥接实现（egui 0.32 + src/we.rs，"starfish-we 事件 → egui::RawInput 翻译桥"）；本目录是新的全量 vendored fork，前者可作意图参考。
-- 上游原版基线在本机：`D:\Rust\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\egui-winit-0.37.0\src`。改前/改后都 diff 这份基线——fork 的自有增量应保持有意且最小，勿把无谓漂移混进 fork（否则以后看不出哪些是魔改）。
+- 区分两个 egui-starfish-we：`starfish/crates/egui-starfish-we` 是旧的最小桥接实现（egui 0.32 + src/we.rs）；本目录是新的 vendored fork（现已无 winit）。
+- 上游原版基线在本机：`D:\Rust\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\egui-winit-0.37.0\src`。改前/改后都 diff 这份基线——fork 的自有增量应保持有意且最小，勿把无谓漂移混进 fork（否则以后看不出哪些是魔改）。注意：fork 现已整体偏离上游（winit 剥离），diff 时按 NOTICE 的修改清单对账，而非期望逐行贴近。
 
 ## 常用命令
 
 ```bash
-cargo check              # 类型检查（不链接，裸 bash 可用）
-cargo build / cargo run  # 链接类操作须在 VS 开发者环境执行（见下）
-cargo test               # 单元测试（目前仅 clipboard.rs 内联 #[test]）
-cargo test <名字片段>     # 跑单个测试
+cargo check                        # 类型检查（不链接，裸 bash 可用）
+cargo check --no-default-features  # 现在可编译（winit 剥离后不再有"无平台后端编不过"问题）
+cargo build / cargo run            # 链接类操作须在 VS 开发者环境执行（见下）
+cargo test                         # 单元测试（目前仅 clipboard.rs 内联 #[test]）
+cargo test <名字片段>                # 跑单个测试
 ```
 
 cargo run --example render_test --features render   # egui 联调窗口（链接须走 vs-cargo.bat；example 依赖 feature render）
 
 - **链接须 VS 环境**：裸 bash 下 link.exe 会误解析到 Git 自带 GNU link；助手脚本 `..\starfish\scripts\vs-cargo.bat <cargo 参数…>`（内部 call VsDevCmd.bat 再跑 cargo）。
 
-## 构建状态（2026-10-23 修通）
+## 构建状态（2026-10-24 随 winit 剥离更新）
 
-`cargo check` / `cargo test`（3 个 clipboard 测试）在 Windows 均通过。为跑通所做、需知的构建层差异：
+`cargo check`（default / --no-default-features / --features render / --all-features / --example render_test）与 `cargo test`（3 个 clipboard 测试）在 Windows 均通过；`cargo check --target aarch64-apple-ios`（default 与 --no-default-features）亦通过（类型检查，未做真机测试）。需知的构建层差异：
 
-- 平台依赖已按上游 target 表门控：objc2*/block2 → macos/ios，smithay-clipboard/wayland-cursor → Linux/BSD，arboard → 非 Android（含 image-data），windows-sys → windows。
-- `winit = "0.30.13", default-features = false`：src 按 0.30 API 编写，后端由 default feature 的 `winit/default` 重开（同上游）；原 `"0.29"` 系笔误。
-- `pub mod clipboard;` 已恢复（lib.rs 引用 `clipboard::Clipboard`）。
-- clipboard.rs 已还原为上游逐字节版本：egui `0.37.0` 的 `ColorImage.pixels` 是字段不是方法，fork 里 `.pixels()`/`.resolution()` 的改法编译不过。
-- 注意 `--no-default-features` 时 winit 无平台后端编不过——上游设计如此，由宿主（eframe 类）开 `winit/default`。
-- 遗留：registry 的 `egui-winit = "0.37"` 仍在依赖里（未被 src 引用，纯过渡；迁移稳定后应移除）；`wgpu` 主依赖现被 `SfEguiRenderer::raw_render` 签名引用。
+- 平台依赖按上游 target 表门控：objc2*/block2 → macos/ios，smithay-clipboard → Linux/BSD，arboard → 非 Android。windows-sys / wayland-cursor / serde / accesskit_winit 随 winit 路径一并移除。
+- `--no-default-features` 现在可编译：上游因 winit 无平台后端编不过，本 fork 无此约束。
+- 依赖树已无 winit（`cargo tree | grep winit` 为空）。
+- feature 表：default = ["clipboard", "links"]；保留 bytemuck / clipboard / links / wayland / render；accesskit / android-game-activity / android-native-activity / x11 / serde 已随 winit 路径删除。
+- **"wayland" 不在 default**：arboard 的 `wayland-data-control` feature 未按平台门控，会把 wl-clipboard-rs/wayland-backend 拉进 iOS 等非 Linux 目标直接编译失败。Linux Wayland 剪贴板主路径 smithay-clipboard 由 "clipboard" 按 target 自带，arboard 该项只是回退路径，需要时显式开 `wayland`。
+- iOS：`safe_area.rs`（objc2-ui-kit）接入 `on_we_event` 的 Resized/FocusGained/Resumed 刷新点，aarch64-apple-ios 已过类型检查，**未做真机测试**。注意 starfish-we 侧 2026-10-24 补了一行 iOS 依赖（`objc2-core-foundation`，其 platform/ios/mod.rs 直接 use 但依赖表漏声明）——属父项目修复，不在本 fork。
 
 ## example/render_test.rs（egui 集成冒烟）
 
@@ -60,16 +61,26 @@ crate 时照此模板补三件套。
 
 ## 与上游的差异（勿把 vendored 代码当自有逻辑乱改）
 
-- `src/clipboard.rs` 与上游逐字节一致（曾按旧 egui 改 `.pixels()`/`.resolution()`，对 egui `=0.37.0` 不成立，已还原）。
-- `src/lib.rs` 的 fork 增量（皆为有意）：删 crate 级文档与一行 clippy expect；恢复 `pub mod clipboard;`；`State::new` 拆出 `new_inner`（display 句柄参数化，供 we 路径复用，Clipboard 的 Wayland display 由 we 路径传 `wl_display*`）；从 winit 路径抽取三个 winit/we 共用助手：`on_key_and_text`（键盘 egui 域主体：剪贴板快捷键折叠 + Key/Text 发射）、`on_cursor_moved_points`、`on_wheel`（滚轮主体，含 macOS 动量判定）；文件末段并入 starfish-we 翻译层（we 专属 `impl State` 块 + `translate_we_key_code` / `translate_we_mouse_button` / `we_pixels_per_point` / `load_system_cjk_fonts` 自由函数，有 `// ---` 分隔线）；另有 feature `render` 的 `SfEguiRenderer`（egui_wgpu::Renderer 包装：`render` 收 starfish-render 包装 pass、`raw_render` 收原生 `RenderPass<'static>`、Deref/DerefMut 透传——egui-wgpu 0.37 硬性要求 'static 通道，`inner_mut()` 的借用给不了，lib.rs 内用一次受控 unsafe（transmute 擦生命周期）桥接——安全不变式（raw 绝不离函数体等三条）写死在 SAFETY 注释里，改动前必读；starfish-render 侧只需提供 `inner`/`inner_mut` 访问器）；文件头部有衍生与许可声明。
-- 其余三个文件（dropped_file / safe_area / macos_scroll_momentum）与上游逐字节一致。注释里的 IME 测试矩阵、TODO(emilk) 均为上游原文；上游的行为语义（IME、多视口、剪贴板模拟回退）对 fork 依然成立。
+- `src/clipboard.rs` 逻辑与上游一致（曾按旧 egui 改 `.pixels()`/`.resolution()`，对 egui `=0.37.0` 不成立，已还原）；2026-10-24 起仅 2 条日志提示的 crate 名改为本 crate。
+- `src/safe_area.rs`、`src/macos_scroll_momentum.rs` 逻辑与上游一致；2026-10-24 把文档注释改写为 starfish-we 语境（原注释描述的探测/回避手法——iOS 安全区直读 UIKit、macOS NSEvent 动量监视——依然必要）。safe_area 的调用点从上游 winit 事件路径移到 `on_we_event`。
+- `src/lib.rs` 的 fork 增量（皆为有意）：
+  - **winit 路径整体移除**：`State::new`/`on_window_event`/`take_egui_input`（winit 版）/`handle_platform_output(_with_event_loop)`、IME 组合窗全套（`on_ime`、`allow_ime`、Windows VK_PROCESSKEY 规避）、位图光标（`CustomCursor`/`apply_cursor`）、accesskit、多视口命令与建窗系（`process_viewport_commands`/`create_window`/`create_winit_window_attributes`/`apply_viewport_builder_to_window`/`set_maximized` 等）、`update_viewport_info`/`inner_rect_in_points`/`outer_rect_in_points`、`short_*_event_description`、`key_from_winit_key`/`key_from_named_key`/`key_from_key_code`（winit 键表）、`translate_cursor`、`to_egui_touch_phase`/`to_egui_theme`。
+  - 键表合并：`translate_we_key_code` + `key_from_key_code` → `we_key_to_egui_key` 一张直通表（`MetaLeft/Right` → `SuperLeft/Right`；winit 独有的 F13+/浏览器/媒体/launch 键 starfish-we 无对应，不映射）。
+  - `translate_mouse_button`（winit 版）删除；`translate_we_mouse_button` 改为直出 egui `PointerButton`，并新增 Back/Forward → Extra1/Extra2（旧版丢弃）。注意 `starfish_we::MouseButton` 是 `#[non_exhaustive]`，match 须留通配臂。
+  - `on_mouse_button_input` 签名 egui 化（`pressed: bool` + `egui::PointerButton`）。
+  - `screen_size_in_pixels` / `pixels_per_point` 收 `starfish_we::Window`（`we_pixels_per_point` 坐正为 `pixels_per_point`）；`State::new_inner` 折叠进 `new_we`。
+  - iOS 安全区刷新点接入 `on_we_event`（Resized/FocusGained/Resumed）。
+  - 删 crate 级文档与一行 clippy expect；恢复 `pub mod clipboard;`；feature `render` 的 `SfEguiRenderer`（egui_wgpu::Renderer 包装：`render` 收 starfish-render 包装 pass、`raw_render` 收原生 `RenderPass<'static>`、Deref/DerefMut 透传——egui-wgpu 0.37 硬性要求 'static 通道，lib.rs 内一次受控 unsafe（transmute 擦生命周期）桥接——安全不变式（raw 绝不离函数体等三条）写死在 SAFETY 注释里，改动前必读；starfish-render 侧只需提供 `inner`/`inner_mut` 访问器）；`load_system_cjk_fonts`；文件头部有衍生与许可声明。
+  - 从上游 winit 路径抽出、现由 we 单路径使用的助手：`on_key_and_text`（剪贴板快捷键折叠 + Key/Text 发射）、`on_cursor_moved_points`、`on_wheel`（滚轮主体，含 macOS 动量判定）。`State` 保留字段 `simulate_touch_screen`（上游调试开关，无公共 setter，恒 false）。
+- 文件删除：`src/window_settings.rs`（eframe 窗口几何持久化，纯 winit）、`src/dropped_file.rs`（starfish-we v1 无 drag-drop 事件，无生产者）。`pub use window_settings::…` 同步移除；feature serde 一并删除。
+- 上游的行为语义（剪贴板模拟回退、`EventResponse` consumed/repaint 语义）对 fork 依然成立；IME 组合、多视口、位图光标、文件拖放语义随 winit 路径移除（starfish-we v1 缺口，见 lib.rs 翻译层模块文档）。
 
 ## 架构
 
-vendored egui-winit 各文件职责：
+fork 各文件职责：
 
-- **`src/lib.rs`**（约 2700 行，主体）：核心是 `State`——把 winit `WindowEvent` 翻译并累积进 `egui::RawInput`（`on_window_event`），`take_egui_input` 交帧，`handle_platform_output(_with_event_loop)` 收尾（光标、剪贴板、IME、虚拟键盘）；`process_viewport_commands` / `create_window` / `apply_viewport_builder_to_window` 支撑 egui 多视口；另有自由函数 `screen_size_in_pixels` / `pixels_per_point` / `update_viewport_info` 等，及 `EventResponse`（`consumed`/`captured`：egui 是否吃掉事件、指针是否落在 egui 面板上）。
-- **starfish-we 翻译层**（lib.rs 末段，魔改主体）：starfish-we → egui 翻译。定约：事件坐标 = 物理像素，points = 物理像素 ÷（`egui_ctx.zoom_factor() × window.dpi_scale()`，未开 `HIGH_PIXEL_DENSITY` 时退化为 1:1）；`KeyCode` 即 W3C code，与 winit `keyboard::KeyCode` 逐名直通后复用上游 `key_from_key_code`（注意 winit 的 Win 键叫 `SuperLeft/Right`，starfish-we 叫 `MetaLeft/Right`）；文本走 `TextInput`（过滤控制字符与命令修饰键）；修饰键随 KeyDown/Up 携带、更新副本并广播 `ModifiersChanged`。v1 缺口：无 MouseLeave（hover 滞留）、IME/位图光标不落窗、`Touch` 忽略（后端已按 SDL 惯例合成鼠标）。用法：
+- **`src/lib.rs`**（约 1000 行）：核心是 `State`——把 starfish-we `Event` 翻译并累积进 `egui::RawInput`（`on_we_event`），`take_egui_input_we` 交帧，`handle_platform_output_we` 收尾（光标可见性、剪贴板、链接）；内部助手 `on_key_and_text` / `on_cursor_moved_points` / `on_wheel`（上游抽出）；翻译自由函数 `we_key_to_egui_key` / `translate_we_mouse_button`；另有 feature `render` 的 `SfEguiRenderer` 与便利函数 `load_system_cjk_fonts`、`screen_size_in_pixels` / `pixels_per_point`。`EventResponse`（`consumed`/`captured` 语义同上游：egui 是否吃掉事件、是否需要重绘）。
+- **starfish-we 翻译层**（lib.rs 中段，定约见其模块文档）：starfish-we → egui 翻译。定约：事件坐标 = 物理像素，points = 物理像素 ÷（`egui_ctx.zoom_factor() × window.dpi_scale()`，未开 `HIGH_PIXEL_DENSITY` 时退化为 1:1）；`KeyCode` 即 W3C code，经 `we_key_to_egui_key` 直通；文本走 `TextInput`（过滤控制字符与命令修饰键）；修饰键随 KeyDown/Up 携带、更新副本并广播 `ModifiersChanged`。v1 缺口：无 MouseLeave（hover 滞留）、IME/位图光标不落窗、文件拖放无事件、`Touch` 忽略（后端已按 SDL 惯例合成鼠标）。用法：
   ```rust
   let mut state = egui_starfish_we::State::new_we(ctx.clone(), ViewportId::ROOT, None, &window);
   loop {
@@ -82,10 +93,8 @@ vendored egui-winit 各文件职责：
       starfish_we::next_frame().await;
   }
   ```
-- **`src/window_settings.rs`**：`WindowSettings`/`WindowGeometry`，feature `serde` 时序列化持久化窗口几何。
-- **`src/clipboard.rs`**：arboard（Win/Mac）+ smithay-clipboard（Wayland）+ 无 OS 剪贴板时的 egui 内部模拟回退；唯一有单元测试的文件。
-- **`src/dropped_file.rs`**：`NativeFile` 实现 `egui::DroppedFile` trait（懒读盘）。
-- **`src/safe_area.rs`**：iOS 刘海/安全区 inset（等 winit 0.31 后可删，见注释）。
-- **`src/macos_scroll_momentum.rs`**：macOS 滚动动量修补（等 winit PR #4732，见 lib.rs 顶部 TODO）。
+- **`src/clipboard.rs`**：arboard（Win/Mac）+ smithay-clipboard（Wayland）+ 无 OS 剪贴板时的 egui 内部模拟回退；唯一有单元测试的文件。Wayland display 句柄在 `new_we` 里从 `we_window.raw_handle()` 提取。
+- **`src/safe_area.rs`**：iOS 刘海/安全区 inset（objc2-ui-kit 直读；等 starfish-we 提供对等 API 后可并入）。
+- **`src/macos_scroll_momentum.rs`**：macOS 滚动动量修补（NSEvent 本地监视器；starfish-we `MouseWheel` 无 source/phase，仍必要）。
 
-**迁移的本质难点——控制流模型相反**：egui-winit 假定 winit 回调式事件循环（`ActiveEventLoop` 驱动），而 starfish-we 是 pull 模型——调用方持 `while` 主循环、`window.poll_event()` 拉取 `starfish_we::Event`（`CloseRequested`/`Resized`/`KeyDown{key,modifiers,repeat}`/…，平台实现在 starfish-we `src/platform/` 横向 cfg）。适配即给 `State` 换事件入口：把 starfish-we `Event` 翻译进 `RawInput` 累积（结构上贴着上游 `on_window_event` 的分派形态做），并为 `EventResponse.captured` 找一条回到 starfish-we 调用方的通路。
+**迁移史（备忘）**：egui-winit 假定 winit 回调式事件循环（`ActiveEventLoop` 驱动），starfish-we 是 pull 模型（调用方持 `while` 主循环、`window.poll_event()` 拉取 `starfish_we::Event`，平台实现在 starfish-we `src/platform/` 横向 cfg）。适配 = 给 `State` 换事件入口：把 starfish-we `Event` 翻译进 `RawInput` 累积 + `EventResponse` 回传调用方。2026-10-23 we/winit 双路径共存；2026-10-24 winit 路径整体拆除。

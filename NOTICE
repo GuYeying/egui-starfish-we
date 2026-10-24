@@ -8,15 +8,52 @@ egui-starfish-we 是 [egui-winit](https://github.com/emilk/egui) v0.37.0 的源�
 - 本 fork 的修改：Copyright (c) 2026 starfish project.
 
 相对上游的修改清单（Apache-2.0 §4(b) 变更声明；详见 CLAUDE.md「与上游的差异」）：
-- Cargo.toml 重新合并：平台依赖按 target 表门控；winit 0.30.13；新增
-  log / profiling / web-time / windows-sys 依赖
+- **winit 依赖整体剥离（2026-10-24）**：本 crate 不再依赖 winit，
+  唯一窗口词汇为 starfish-we（SDL 风格 pull 模型）。上游以 winit
+  `Window`/`WindowEvent`/`ActiveEventLoop` 为词汇的路径已移除：
+  `State::new` / `on_window_event` / `take_egui_input`（winit 版）/
+  `handle_platform_output(_with_event_loop)`、多视口命令
+  （`process_viewport_commands` / `create_window` /
+  `create_winit_window_attributes` / `apply_viewport_builder_to_window` 等）、
+  IME 组合窗（`on_ime` / `set_ime_*` / Windows VK_PROCESSKEY 规避）、
+  位图光标（`CustomCursor` / `apply_cursor`）、accesskit 桥、
+  `update_viewport_info` / `inner_rect_in_points` /
+  `outer_rect_in_points` / `short_*_event_description`、
+  `src/window_settings.rs`（整个文件）与 `src/dropped_file.rs`
+  （整个文件；starfish-we v1 无 drag-drop 事件，无生产者）。
+  依赖同步移除：winit、egui-winit（过渡共存件）、accesskit_winit、
+  windows-sys、wayland-cursor、serde。
+- 键盘翻译表合并：上游 `translate_we_key_code` + `key_from_key_code`
+  两段 winit 直通合并为 `we_key_to_egui_key` 一张直通表
+  （starfish-we `KeyCode` → egui `Key`，`MetaLeft/Right` →
+  `SuperLeft/Right`）；`translate_mouse_button`（winit `MouseButton` →
+  egui）并入 `translate_we_mouse_button`（starfish-we `MouseButton` →
+  egui `PointerButton` 直通，新增 Back/Forward → Extra1/Extra2）。
+- `State::on_mouse_button_input` 签名改为 egui 域
+  （`pressed: bool` + `egui::PointerButton`，替换 winit
+  `ElementState`/`MouseButton`）。
+- 公共 API 换窗口词汇：`screen_size_in_pixels` /
+  `pixels_per_point`（原 `we_pixels_per_point` 坐正）收
+  `starfish_we::Window`。
+- iOS 安全区接线：`on_we_event` 在 Resized/FocusGained/Resumed 时刷新
+  `egui_input.safe_area_insets`（上游在 winit 事件路径刷新；
+  starfish-we 无 ScaleFactorChanged/Occluded 事件）。**未实测**
+  （需 iOS 工具链与真机/模拟器）。
 - 新增 starfish-we 翻译层：`State::new_we` / `on_we_event` /
   `take_egui_input_we` / `handle_platform_output_we`、`load_system_cjk_fonts`
-  及 `translate_we_*` 翻译表
-- 自 winit 路径抽取共用助手：`on_key_and_text` / `on_cursor_moved_points` /
-  `on_wheel`，及 `State::new_inner`
-- 恢复 `pub mod clipboard;`
+- 自 winit 路径抽取的共用助手（现 starfish-we 单路径使用）：
+  `on_key_and_text` / `on_cursor_moved_points` / `on_wheel`
+- 删 crate 级文档与一行 clippy expect；恢复 `pub mod clipboard;`
 - 新增 feature `render` 与 `SfEguiRenderer`（egui_wgpu::Renderer 包装：
   `render` 收 starfish-render 的 `RenderPass` 包装的可变引用
   （不转移所有权，内部以受控 unsafe 擦生命周期，契约见 lib.rs）、`raw_render`
   收原生 `wgpu::RenderPass<'static>`，经 `Deref`/`DerefMut` 透传 update_* 方法）
+- feature 表清理（去 accesskit / android-* / x11 / serde / winit 相关开关）；
+  "wayland" 移出 default（arboard 的 wayland-data-control 未按平台门控，
+  会把 wl-clipboard-rs/wayland-backend 拉进 iOS 等目标编译失败；
+  Linux Wayland 剪贴板主路径 smithay-clipboard 由 "clipboard" 按 target 自带）
+
+- 注释与文案本地化（2026-10-24）：`src/clipboard.rs`（2 条日志提示的
+  crate 名改为本 crate）、`src/safe_area.rs` / `src/macos_scroll_momentum.rs`
+  （文档注释改写为 starfish-we 语境）。**逻辑零改动**；fork 整体转向
+  starfish-we 后，"上游逐字节"标记不再保留。

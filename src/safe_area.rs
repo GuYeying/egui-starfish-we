@@ -15,8 +15,9 @@ mod ios {
     /// device’s interactive and display features, like Dynamic Island on iPhone or the camera
     /// housing on some Mac models.
     ///
-    /// Once winit v0.31 has been released this can be removed in favor of
-    /// `winit::Window::safe_area`.
+    /// If starfish-we eventually exposes the insets on its `Window` API,
+    /// this direct UIKit read can be removed in favor of that (upstream
+    /// egui-winit expected the same from winit 0.31).
     pub fn get_safe_area_insets() -> SafeAreaInsets {
         let Some(main_thread_marker) = MainThreadMarker::new() else {
             log::error!("Getting safe area insets needs to be performed on the main thread");
