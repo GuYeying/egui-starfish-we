@@ -36,7 +36,8 @@ cargo run --example render_test --features render   # egui 联调窗口（链接
 - 依赖树已无 winit（`cargo tree | grep winit` 为空）。
 - feature 表：default = ["clipboard", "links"]；保留 bytemuck / clipboard / links / wayland / render；accesskit / android-game-activity / android-native-activity / x11 / serde 已随 winit 路径删除。
 - **"wayland" 不在 default**：arboard 的 `wayland-data-control` feature 未按平台门控，会把 wl-clipboard-rs/wayland-backend 拉进 iOS 等非 Linux 目标直接编译失败。Linux Wayland 剪贴板主路径 smithay-clipboard 由 "clipboard" 按 target 自带，arboard 该项只是回退路径，需要时显式开 `wayland`。
-- iOS：`safe_area.rs`（objc2-ui-kit）接入 `on_we_event` 的 Resized/FocusGained/Resumed 刷新点，aarch64-apple-ios 已过类型检查，**未做真机测试**。注意 starfish-we 侧 2026-10-24 补了一行 iOS 依赖（`objc2-core-foundation`，其 platform/ios/mod.rs 直接 use 但依赖表漏声明）——属父项目修复，不在本 fork。
+- arboard 依赖门控为 `not(android, wasm32)`、clipboard.rs 代码门控同步加了 `not(target_arch = "wasm32")`——wasm 上默认 feature 现在可编译（OS 剪贴板不存在，走 egui 应用内模拟回退）。
+- iOS：`safe_area.rs`（objc2-ui-kit）接入 `on_we_event` 的 Resized/FocusGained/Resumed 刷新点。**输入链路已在 starfish-we 侧补齐**（2026-10-24）：触摸（Touch + 主手指合成鼠标）、软键盘（隐藏 UITextField 拦截 insertText/deleteBackward → TextInput/Backspace 键对）、硬件按键（UIPress HID → KeyCode）、前后台（Suspended/Resumed），公共 API `Window::set_text_input_visible` 控制软键盘显隐——fork 侧无需改动（合成鼠标与 TextInput 均走既有 we 事件路径）。桥层两个 iOS 目标（device/sim）类型检查通过；**真机/模拟器运行均未测试**（用户指示：测试后置）。
 
 ## example/render_test.rs（egui 集成冒烟）
 

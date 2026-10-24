@@ -54,7 +54,9 @@ webbrowser = {version="1.2.4",optional=true} # 1.2.2 fixes RUSTSEC-2026-0257 (`B
 [target.'cfg(any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd", target_os = "netbsd", target_os = "openbsd"))'.dependencies]
 smithay-clipboard = {version="0.7.2",optional=true} # 保持 0.7.2：0.7.3 会拉入 smithay-client-toolkit 0.20（calloop 0.14）造成重复依赖
 
-[target.'cfg(not(target_os = "android"))'.dependencies]
+[target.'cfg(all(not(target_os = "android"), not(target_arch = "wasm32")))'.dependencies]
+# arboard 不支持 wasm（且会连带 wayland 依赖）；wasm 上剪贴板走
+# clipboard.rs 的 egui 应用内模拟回退。
 arboard = { version = "3.6", default-features = false, optional = true, features = ["image-data"] }
 
 [target.'cfg(target_os = "ios")'.dependencies]

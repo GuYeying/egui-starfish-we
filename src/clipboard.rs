@@ -6,7 +6,7 @@ use raw_window_handle::RawDisplayHandle;
 /// then a fallback clipboard that just works within the same app is used instead.
 pub struct Clipboard {
     #[cfg(all(
-        not(any(target_os = "android", target_os = "ios")),
+        not(any(target_os = "android", target_os = "ios")), not(target_arch = "wasm32"),
         feature = "arboard",
     ))]
     arboard: Option<arboard::Clipboard>,
@@ -38,7 +38,7 @@ impl Clipboard {
     pub unsafe fn new(_raw_display_handle: Option<RawDisplayHandle>) -> Self {
         Self {
             #[cfg(all(
-                not(any(target_os = "android", target_os = "ios")),
+                not(any(target_os = "android", target_os = "ios")), not(target_arch = "wasm32"),
                 feature = "arboard",
             ))]
             arboard: init_arboard(),
@@ -88,7 +88,7 @@ impl Clipboard {
         }
 
         #[cfg(all(
-            not(any(target_os = "android", target_os = "ios")),
+            not(any(target_os = "android", target_os = "ios")), not(target_arch = "wasm32"),
             feature = "arboard",
         ))]
         if let Some(clipboard) = &mut self.arboard {
@@ -127,7 +127,7 @@ impl Clipboard {
         }
 
         #[cfg(all(
-            not(any(target_os = "android", target_os = "ios")),
+            not(any(target_os = "android", target_os = "ios")), not(target_arch = "wasm32"),
             feature = "arboard",
         ))]
         if let Some(clipboard) = &mut self.arboard {
@@ -151,7 +151,7 @@ impl Clipboard {
     )]
     pub fn get_image(&mut self) -> Option<egui::ColorImage> {
         #[cfg(all(
-            not(any(target_os = "android", target_os = "ios")),
+            not(any(target_os = "android", target_os = "ios")), not(target_arch = "wasm32"),
             feature = "arboard",
         ))]
         if let Some(clipboard) = &mut self.arboard {
@@ -178,7 +178,7 @@ impl Clipboard {
     )]
     pub fn set_image(&mut self, image: &egui::ColorImage) {
         #[cfg(all(
-            not(any(target_os = "android", target_os = "ios")),
+            not(any(target_os = "android", target_os = "ios")), not(target_arch = "wasm32"),
             feature = "arboard",
         ))]
         if let Some(clipboard) = &mut self.arboard {
@@ -290,7 +290,7 @@ cfg_select! {
 /// Pulled out as its own pure function (rather than inlined in the two `match`es above) so it
 /// can be unit-tested without touching the real OS clipboard, which CI can't rely on.
 #[cfg(all(
-    not(any(target_os = "android", target_os = "ios")),
+    not(any(target_os = "android", target_os = "ios")), not(target_arch = "wasm32"),
     feature = "arboard",
 ))]
 fn is_expected_content_absence(err: &arboard::Error) -> bool {
@@ -298,7 +298,7 @@ fn is_expected_content_absence(err: &arboard::Error) -> bool {
 }
 
 #[cfg(all(
-    not(any(target_os = "android", target_os = "ios")),
+    not(any(target_os = "android", target_os = "ios")), not(target_arch = "wasm32"),
     feature = "arboard",
 ))]
 fn color_image_from_arboard(image: &arboard::ImageData<'_>) -> egui::ColorImage {
@@ -307,7 +307,7 @@ fn color_image_from_arboard(image: &arboard::ImageData<'_>) -> egui::ColorImage 
 
 /// arboard expects unmultiplied alpha, but [`egui::Color32`] is premultiplied.
 #[cfg(all(
-    not(any(target_os = "android", target_os = "ios")),
+    not(any(target_os = "android", target_os = "ios")), not(target_arch = "wasm32"),
     feature = "arboard",
 ))]
 fn arboard_from_color_image(image: &egui::ColorImage) -> arboard::ImageData<'static> {
@@ -324,7 +324,7 @@ fn arboard_from_color_image(image: &egui::ColorImage) -> arboard::ImageData<'sta
 }
 
 #[cfg(all(
-    not(any(target_os = "android", target_os = "ios")),
+    not(any(target_os = "android", target_os = "ios")), not(target_arch = "wasm32"),
     feature = "arboard",
 ))]
 fn init_arboard() -> Option<arboard::Clipboard> {
@@ -376,7 +376,7 @@ unsafe fn init_smithay_clipboard(
 }
 
 #[cfg(all(
-    not(any(target_os = "android", target_os = "ios")),
+    not(any(target_os = "android", target_os = "ios")), not(target_arch = "wasm32"),
     feature = "arboard",
 ))]
 #[cfg(test)]
