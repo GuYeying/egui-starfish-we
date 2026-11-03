@@ -117,6 +117,7 @@ async fn app_body() -> Result<(), Box<dyn std::error::Error>> {
             size_in_pixels: [w, h],
             pixels_per_point: egui_output.pixels_per_point,
         };
+        
         let mut egui_encoder = context.device()
             .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("egui_upload") });
         let mut cmds = egui_renderer.update_buffers(
