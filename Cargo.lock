@@ -2572,6 +2572,7 @@ checksum = "6ce2be8dc25455e1f91df71bfa12ad37d7af1092ae736f3a6cd0e37bc7810596"
 [[package]]
 name = "starfish-debug"
 version = "0.9.62"
+source = "git+https://github.com/GuYeying/starfish#5bc1bbe9d49dac1bbee7be8c9a1b7c754f47369a"
 dependencies = [
  "log",
  "wasm-bindgen",
@@ -2581,6 +2582,7 @@ dependencies = [
 [[package]]
 name = "starfish-io"
 version = "0.9.62"
+source = "git+https://github.com/GuYeying/starfish#5bc1bbe9d49dac1bbee7be8c9a1b7c754f47369a"
 dependencies = [
  "js-sys",
  "ndk",
@@ -2594,6 +2596,7 @@ dependencies = [
 [[package]]
 name = "starfish-render"
 version = "0.9.62"
+source = "git+https://github.com/GuYeying/starfish#5bc1bbe9d49dac1bbee7be8c9a1b7c754f47369a"
 dependencies = [
  "bytemuck",
  "glam",
@@ -2611,6 +2614,7 @@ dependencies = [
 [[package]]
 name = "starfish-std"
 version = "0.9.62"
+source = "git+https://github.com/GuYeying/starfish#5bc1bbe9d49dac1bbee7be8c9a1b7c754f47369a"
 dependencies = [
  "console_error_panic_hook",
  "pollster",
@@ -2622,6 +2626,7 @@ dependencies = [
 [[package]]
 name = "starfish-time"
 version = "0.9.62"
+source = "git+https://github.com/GuYeying/starfish#5bc1bbe9d49dac1bbee7be8c9a1b7c754f47369a"
 dependencies = [
  "web-sys",
 ]
@@ -2629,6 +2634,7 @@ dependencies = [
 [[package]]
 name = "starfish-we"
 version = "0.9.62"
+source = "git+https://github.com/GuYeying/starfish#5bc1bbe9d49dac1bbee7be8c9a1b7c754f47369a"
 dependencies = [
  "android-activity",
  "js-sys",

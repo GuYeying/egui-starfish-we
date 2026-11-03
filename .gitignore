@@ -1,3 +1,6 @@
 /target
 render_test.log
 *.png
+
+# 开发者本机依赖覆盖（paths）
+.cargo/config.toml
