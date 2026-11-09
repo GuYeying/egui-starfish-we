@@ -102,6 +102,10 @@ pub struct State {
     /// See [`Self::set_clipboard_shortcuts`].
     clipboard_shortcuts: bool,
 
+    /// 软键盘生命周期同步游标（上一帧 `egui_wants_keyboard_input()` 读数
+    /// ——隐式文本输入的增量比较基准，见 [`Self::take_egui_input_we`]）
+    text_input_kb: bool,
+
     // macOS 动量判定：窗口层（上游 winit、今 starfish-we）都不报告滚动的
     // source/phase，只能靠本 NSEvent 监视器（见 macos_scroll_momentum.rs）。
     #[cfg(target_os = "macos")]
@@ -172,9 +176,18 @@ impl State {
 
             clipboard_shortcuts: true,
 
+            text_input_kb: false,
+
             #[cfg(target_os = "macos")]
             scroll_momentum_monitor: ScrollMomentumMonitor::install(),
         };
+
+        // 场启动清残留（隐式文本输入 · 启动收口）：TEXT_INPUT_ACTIVE 是
+        // starfish-we 进程级 static——上一场/上一应用退出时 TextEdit 若仍
+        // 激活则 true 跨场残留，新场任意点按会误弹软键盘（真机实证）。
+        // State 每场/每应用新建——构造即收口，随后由 take_egui_input_we
+        // 增量接管。桌面 no-op（flag 翻转无副作用消费者）
+        starfish_we::stop_text_input();
 
         if let Some(max_texture_side) = max_texture_side {
             slf.set_max_texture_side(max_texture_side);
@@ -645,6 +658,52 @@ impl State {
             .entry(self.viewport_id)
             .or_default()
             .native_pixels_per_point = Some(we_window.dpi_scale());
+
+        // ── 隐式文本输入（跨平台自动——调用方零感知）──
+        // 两段策略挂在每帧必经路径：①点空白失焦 ②键盘生命周期跟随
+        // egui_wants_keyboard_input。桌面 no-op；Android+embedded = 软键
+        // 盘自动弹/收。resize 同级别的隐式处理，纯 Rust 宿主与脚本层同享。
+        //
+        // ①点空白失焦：egui 上游点击被动区不丢焦（只有点另一可交互控件
+        // 才移焦）——触屏端表现为输入框常亮、软键盘永不收。主键按下帧若
+        // 按点不在当前聚焦控件矩形内（空白/被动区/其他控件），主动
+        // stop_text_input 失焦。失焦先行于本帧（egui 尚未见按点）：命中
+        // TextEdit 的点击会在帧内 request_focus 复得——聚焦行为不受影响。
+        // Surface/纯展示形态的事件剥除在调用方（本桥不感知，被动区判
+        // 定自然旁路）
+        if let Some(pos) = self.egui_input.events.iter().find_map(|ev| match ev {
+            egui::Event::PointerButton {
+                pos,
+                button: egui::PointerButton::Primary,
+                pressed: true,
+                ..
+            } => Some(*pos),
+            _ => None,
+        }) {
+            let hit_focused = self
+                .egui_ctx
+                .memory(|m| m.focused())
+                .and_then(|id| self.egui_ctx.read_response(id))
+                .map(|r| r.rect.contains(pos))
+                .unwrap_or(false);
+            if !hit_focused {
+                self.egui_ctx.memory_mut(|m| m.stop_text_input());
+            }
+        }
+
+        // ②键盘生命周期：wants 变化 → 平台软键盘自动跟（Android =
+        // showSoftInput/hideSoftInput；桌面 no-op——硬件键盘恒可用）。
+        // wants 读数 = 上一帧末状态（本帧尚未 run）——增量比较，滞后一
+        // 帧的隐式节奏不变。首读 false 与构造期清残留衔接（不重复调用）
+        let wants_kb = self.egui_ctx.egui_wants_keyboard_input();
+        if self.text_input_kb != wants_kb {
+            if wants_kb {
+                starfish_we::start_text_input();
+            } else {
+                starfish_we::stop_text_input();
+            }
+            self.text_input_kb = wants_kb;
+        }
 
         self.egui_input.take()
     }
