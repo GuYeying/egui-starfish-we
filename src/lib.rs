@@ -760,6 +760,15 @@ pub fn load_system_cjk_fonts(ctx: &egui::Context) -> bool {
             "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
             "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
         ]
+    } else if cfg!(target_os = "android") {
+        // Android 系统字体（/system/fonts 全局可读——设备/模拟器均含
+        // Noto CJK；卓易通容器字体布局同源）
+        &[
+            "/system/fonts/NotoSansCJK-Regular.ttc",
+            "/system/fonts/NotoSansCJK.ttc",
+            "/system/fonts/NotoSansSC-Regular.otf",
+            "/system/fonts/DroidSansFallback.ttf",
+        ]
     } else {
         &["C:/Windows/Fonts/msyh.ttc", "C:/Windows/Fonts/simhei.ttf"]
     };
