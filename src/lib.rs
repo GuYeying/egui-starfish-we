@@ -132,7 +132,7 @@ impl State {
         profiling::function_scope!();
 
         let egui_input = egui::RawInput {
-            focused: false, // FocusGained/FocusLost 事件会告知我们
+            focused: true, // 嵌入形态恒有焦点（嵌入式 app 是唯一前台——无 Focus 事件源）
             ..Default::default()
         };
 
