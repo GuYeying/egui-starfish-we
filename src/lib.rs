@@ -44,10 +44,15 @@ pub fn screen_size_in_pixels(window: &starfish_we::Window) -> egui::Vec2 {
 
 /// Calculate the `pixels_per_point` for a given window, given the current egui zoom factor.
 ///
-/// we 域定约：物理像素 ÷（egui 缩放 × 窗口 DPI）= points；
-/// 未开 `HIGH_PIXEL_DENSITY` 时 dpi_scale = 1，退化为 1:1。
-pub fn pixels_per_point(egui_ctx: &egui::Context, window: &starfish_we::Window) -> f32 {
-    egui_ctx.zoom_factor() * window.dpi_scale()
+/// 2026-11-13 修正：直接取 `Context::pixels_per_point`（0.37 起 f32 恒
+/// 有值；显式 set 优先语义）。此前自算 `zoom × dpi_scale` 绕开显式值
+/// ——`set_scale` 实效为空挂；且 web 上引擎位图 1:1 CSS、逻辑面 =
+/// set_mode 尺寸，devicePixelRatio 不适用（手机实测乘 dpr → egui 逻辑
+/// 面 = 屏宽/dpr → UI 比例放大 dpr 倍）。pygame_gui init 按 物理/逻辑
+/// 显式 set（egui 逻辑面恒 = set_mode 逻辑尺寸，三端 UI 比例一致）；
+/// 未 set 的直用宿主保持 egui 默认 1.0。
+pub fn pixels_per_point(egui_ctx: &egui::Context, _window: &starfish_we::Window) -> f32 {
+    egui_ctx.pixels_per_point() * egui_ctx.zoom_factor()
 }
 
 // ----------------------------------------------------------------------------
