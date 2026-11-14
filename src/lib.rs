@@ -95,6 +95,9 @@ pub struct State {
     pointer_pos_in_points: Option<egui::Pos2>,
     any_pointer_button_down: bool,
     current_cursor_icon: Option<egui::CursorIcon>,
+    /// 聚焦控件矩形缓存（run 后缓存——hit 判定不依赖 read_response 的
+    /// 偶发 None——2026-11-14 手机点外失焦异常根因）
+    focused_rect_cache: Option<egui::Rect>,
 
     clipboard: clipboard::Clipboard,
 
@@ -178,6 +181,7 @@ impl State {
             pointer_pos_in_points: None,
             any_pointer_button_down: false,
             current_cursor_icon: None,
+            focused_rect_cache: None,
 
             clipboard,
 
@@ -705,14 +709,25 @@ impl State {
             } => Some(*pos),
             _ => None,
         }) {
-            let hit_focused = self
-                .egui_ctx
-                .memory(|m| m.focused())
-                .and_then(|id| self.egui_ctx.read_response(id))
-                .map(|r| r.rect.contains(pos))
-                .unwrap_or(false);
-            if !hit_focused {
-                self.egui_ctx.memory_mut(|m| m.stop_text_input());
+            // 点外失焦（2026-11-14 重写）：编辑态（focused_rect_cache 有
+            // 值 = egui 有键盘焦点）且点击不在聚焦控件矩形内 → 失焦 +
+            // 剥除本帧指针事件（防 egui 帧内复得焦点回弹——手机实测键盘
+            // 收了又弹）。hit 判定用 run 后缓存的聚焦矩形（不依赖 take
+            // 时 read_response 的偶发 None——上一版失焦异常根因）
+            if let (Some(frect), true) =
+                (self.focused_rect_cache, self.egui_input.focused)
+            {
+                if !frect.contains(pos) {
+                    self.egui_ctx.memory_mut(|m| m.stop_text_input());
+                    self.focused_rect_cache = None;
+                    self.egui_input.events.retain(|ev| {
+                        !matches!(
+                            ev,
+                            egui::Event::PointerButton { .. }
+                                | egui::Event::PointerMoved { .. }
+                        )
+                    });
+                }
             }
         }
 
@@ -741,6 +756,14 @@ impl State {
         platform_output: egui::PlatformOutput,
     ) {
         profiling::function_scope!();
+
+        // 聚焦控件矩形缓存填充（run 后本帧 response 稳定可读——点外
+        // 失焦判定的 hit 依据；read_response 的偶发 None 根因绕开）
+        self.focused_rect_cache = self
+            .egui_ctx
+            .memory(|m| m.focused())
+            .and_then(|id| self.egui_ctx.read_response(id))
+            .map(|r| r.rect);
 
         let egui::PlatformOutput {
             commands,
@@ -801,6 +824,8 @@ impl State {
     }
 
     fn on_we_keyboard_input(&mut self, key: starfish_we::KeyCode, pressed: bool) {
+        // 临时诊断（一次删 2 个定位）：key 转发序
+        log::warn!("[egui-bridge] key {} pressed={}", format!("{:?}", key), pressed);
         // KeyCode 即 W3C code：物理键直通；无逻辑键、无随键文本
         //（文本由 TextInput 事件负责，见 `on_we_text_input`）。
         let physical_key = we_key_to_egui_key(key);
