@@ -111,6 +111,10 @@ pub struct State {
     /// ——隐式文本输入的增量比较基准，见 [`Self::take_egui_input_we`]）
     text_input_kb: bool,
 
+    /// egui 逻辑面尺寸（set_mode 逻辑尺寸——脚本 `set_logical_size` 注入，
+    /// None = 回退 物理/ppp；见 [`Self::take_egui_input_we`]）
+    logical_size: Option<egui::Vec2>,
+
     // macOS 动量判定：窗口层（上游 winit、今 starfish-we）都不报告滚动的
     // source/phase，只能靠本 NSEvent 监视器（见 macos_scroll_momentum.rs）。
     #[cfg(target_os = "macos")]
@@ -182,6 +186,7 @@ impl State {
             clipboard_shortcuts: true,
 
             text_input_kb: false,
+            logical_size: None,
 
             #[cfg(target_os = "macos")]
             scroll_momentum_monitor: ScrollMomentumMonitor::install(),
@@ -507,6 +512,12 @@ impl State {
 // - 多视口/ViewportCommand 不支持：starfish-we 为单窗口 pull 模型。
 
 impl State {
+    /// 注入 egui 逻辑面尺寸（set_mode 逻辑尺寸——脚本/集成方在
+    /// set_mode / 窗口尺寸变化时调用；None = 回退 物理/ppp）
+    pub fn set_logical_size(&mut self, w: f32, h: f32) {
+        self.logical_size = Some(egui::vec2(w, h));
+    }
+
     /// starfish-we 的 `poll_event()` 出一条喂一条；结果见 [`Self::egui_input`]，
     /// 帧首用 [`Self::take_egui_input_we`] 取走。
     pub fn on_we_event(
@@ -648,8 +659,17 @@ impl State {
 
         // 最小化时宽高为 0（同上游 Windows 注记），交给 screen_rect 的 >0 判断
         let screen_size_in_pixels = screen_size_in_pixels(we_window);
-        let screen_size_in_points =
-            screen_size_in_pixels / pixels_per_point(&self.egui_ctx, we_window);
+        // egui 逻辑面 = set_mode 逻辑尺寸定约（2026-11-14 竖屏 letterbox
+        // 修正）：竖屏（letterbox 两侧黑边）下 x/y 的 物理/逻辑 比不同，
+        // ppp 单值无法表达——screen_rect 直接用逻辑尺寸（与引擎 letterbox
+        // 同域：黑边区点击不误触、布局恒 = set_mode 尺寸三端一致）。
+        // 事件坐标同为画布域（pygame_to_we 已转左上），pos 不再 ÷ppp
+        let screen_size_in_points = self
+            .logical_size
+            .filter(|s| s.x > 0.0 && s.y > 0.0)
+            .unwrap_or_else(|| {
+                screen_size_in_pixels / pixels_per_point(&self.egui_ctx, we_window)
+            });
 
         self.egui_input.screen_rect = (screen_size_in_points.x > 0.0
             && screen_size_in_points.y > 0.0)
