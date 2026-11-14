@@ -878,8 +878,12 @@ impl State {
     }
 
     fn on_we_cursor_moved(&mut self, we_window: &starfish_we::Window, x: f64, y: f64) {
-        let pixels_per_point = pixels_per_point(&self.egui_ctx, we_window);
-        let pos_in_points = egui::pos2(x as f32 / pixels_per_point, y as f32 / pixels_per_point);
+        // 事件坐标 = 画布逻辑点域（宿主收口：物理→逻辑 letterbox 逆映射
+        // 在引擎事件链完成——2026-11-18 Android 实证：此处再 ÷ppp = 二次
+        // 缩放（y 恰好整除掩盖、x 偏出画布域 = 事件严重偏移；桌面 ppp=1
+        // 恒等所以从未暴露）。pos 直入 points 域
+        let _ = we_window;
+        let pos_in_points = egui::pos2(x as f32, y as f32);
         self.on_cursor_moved_points(pos_in_points);
     }
 }
