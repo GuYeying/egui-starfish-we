@@ -98,6 +98,8 @@ pub struct State {
     /// 聚焦控件矩形缓存（run 后缓存——hit 判定不依赖 read_response 的
     /// 偶发 None——2026-11-14 手机点外失焦异常根因）
     focused_rect_cache: Option<egui::Rect>,
+    /// 诊断帧计数（ppp 打点节流）
+    diag_frame: u64,
 
     clipboard: clipboard::Clipboard,
 
@@ -182,6 +184,7 @@ impl State {
             any_pointer_button_down: false,
             current_cursor_icon: None,
             focused_rect_cache: None,
+            diag_frame: 0,
 
             clipboard,
 
@@ -682,11 +685,26 @@ impl State {
         // Tell egui which viewport is now active:
         self.egui_input.viewport_id = self.viewport_id;
 
-        self.egui_input
-            .viewports
-            .entry(self.viewport_id)
-            .or_default()
-            .native_pixels_per_point = Some(we_window.dpi_scale());
+        // native_pixels_per_point 停喂（2026-11-14 手机实测"启动对→过一会
+        // 自动变大"根治）：egui 每帧自动应用 native 值（= devicePixelRatio）
+        // 会覆盖集成方的显式 set（物理/逻辑 定约）——手机上显式 3.04 被
+        // dpr 覆盖后 egui 逻辑面漂移 = UI 过大。集成方（pygame_gui init）
+        // 已显式 set_pixels_per_point，此处不再代管缩放
+
+        // 临时诊断（ppp 跳变轮询定位）：每 60 帧打一次 ppp/位图/逻辑
+        self.diag_frame = self.diag_frame.wrapping_add(1);
+        if self.diag_frame % 60 == 0 {
+            log::warn!(
+                "[egui-pp] take ppp={:.3} (ctx={:.3} dpi={:.3}) bitmap={}x{} logical={:?} rect={:?}",
+                pixels_per_point(&self.egui_ctx, we_window),
+                self.egui_ctx.pixels_per_point(),
+                we_window.dpi_scale(),
+                screen_size_in_pixels.x,
+                screen_size_in_pixels.y,
+                self.logical_size.map(|s| (s.x, s.y)),
+                self.egui_input.screen_rect.map(|r| (r.width(), r.height()))
+            );
+        }
 
         // ── 隐式文本输入（跨平台自动——调用方零感知）──
         // 两段策略挂在每帧必经路径：①点空白失焦 ②键盘生命周期跟随
