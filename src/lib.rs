@@ -536,6 +536,19 @@ impl State {
 
         use starfish_we::Event as We;
 
+        // 临时诊断（键盘呼出定位）：指针/焦点/文本事件到达打点
+        if matches!(
+            event,
+            We::MouseDown { .. } | We::MouseUp { .. } | We::FocusGained | We::FocusLost | We::TextInput { .. }
+        ) {
+            log::warn!(
+                "[egui-bridge] on_we_event {:?} pos={:?} focused={}",
+                std::mem::discriminant(event),
+                self.pointer_pos_in_points,
+                self.egui_input.focused
+            );
+        }
+
         #[cfg(target_os = "ios")]
         if matches!(event, We::Resized { .. } | We::FocusGained | We::Resumed) {
             // 安全区（刘海 / 灵动岛）随窗口几何与前后台切换刷新。上游在
